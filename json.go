@@ -1,10 +1,11 @@
 package jsontime
 
 import (
-	"github.com/json-iterator/go"
-	"time"
 	"strconv"
+	"time"
 	"unsafe"
+
+	"github.com/json-iterator/go"
 )
 
 var ConfigWithCustomTimeFormat = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -132,7 +133,7 @@ func (extension *CustomTimeExtension) UpdateStructDescriptor(structDescriptor *j
 				*tpp = t
 			} else {
 				tp := (*time.Time)(ptr)
-				if tp != nil && t != nil{
+				if tp != nil && t != nil {
 					*tp = *t
 				}
 			}
