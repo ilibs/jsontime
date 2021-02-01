@@ -19,7 +19,6 @@ type CustomTimeExtension struct {
 }
 
 func (extension *CustomTimeExtension) UpdateStructDescriptor(structDescriptor *jsoniter.StructDescriptor) {
-
 	for _, binding := range structDescriptor.Fields {
 		var typeErr error
 		var isPtr bool
@@ -33,7 +32,9 @@ func (extension *CustomTimeExtension) UpdateStructDescriptor(structDescriptor *j
 			continue
 		}
 
-		formatTag := binding.Field.Tag().Get("time_format")
+		timeTag := binding.Field.Tag().Get("time_format")
+		formatTag, ops := parseTag(timeTag)
+
 		timeFormat := formatTag
 		if timeFormat == "sql_datetime" {
 			timeFormat = "2006-01-02 15:04:05"
@@ -52,14 +53,6 @@ func (extension *CustomTimeExtension) UpdateStructDescriptor(structDescriptor *j
 			} else {
 				locale = loc
 			}
-		}
-
-		var isSnap bool
-		snapTag := binding.Field.Tag().Get("time_snap")
-		if snapTag == "" && (formatTag == "sql_datetime" || formatTag == "sql_date") {
-			isSnap = true
-		} else {
-			isSnap, _ = strconv.ParseBool(binding.Field.Tag().Get("time_snap"))
 		}
 
 		binding.Encoder = &funcEncoder{fun: func(ptr unsafe.Pointer, stream *jsoniter.Stream) {
@@ -86,9 +79,9 @@ func (extension *CustomTimeExtension) UpdateStructDescriptor(structDescriptor *j
 			if tp != nil {
 				lt := tp.In(locale)
 				str := lt.Format(format)
-				if formatTag == "sql_date" && (str == "0000-01-01" || (isSnap && lt.Unix() <= 0)) {
+				if formatTag == "sql_date" && str == "0000-01-01" {
 					str = "0000-00-00"
-				} else if formatTag == "sql_datetime" && (str == "0000-01-01 00:00:00" || (isSnap && lt.Unix() <= 0)) {
+				} else if formatTag == "sql_datetime" && str == "0000-01-01 00:00:00" {
 					str = "0000-00-00 00:00:00"
 				}
 				stream.WriteString(str)
@@ -115,8 +108,9 @@ func (extension *CustomTimeExtension) UpdateStructDescriptor(structDescriptor *j
 			if str != "" {
 				var err error
 				tmp, err := time.ParseInLocation(format, str, locale)
+
 				if err != nil {
-					if _, ok := err.(*time.ParseError); ok {
+					if _, ok := err.(*time.ParseError); ok && ops.Contains("default") {
 						tmp = time.Date(0, 1, 1, 0, 0, 0, 0, locale)
 					} else {
 						iter.Error = err
